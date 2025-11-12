@@ -1,0 +1,6 @@
+{
+  "database_url": "https://iot-uit-hmn-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "path": "sensors",
+  "push_interval_seconds": 5,
+  "max_queue": 200
+}

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IoT Water Quality Dashboard</title>
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+    />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    <style>
+      :root {
+        --primary: #007bff;
+        --secondary: #f4f6fb;
+        --accent: #27ae60;
+        --danger: #c0392b;
+        --warning: #e67e22;
+        --info: #16a085;
+        --purple: #8e44ad;
+        --white: #fff;
+        --gray: #6c757d;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-family: 'Roboto', Arial, sans-serif;
+        background: var(--secondary);
+        color: #222;
+      }
+
+      .dashboard-layout {
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 220px;
+        min-width: 60px;
+        background: var(--primary);
+        color: var(--white);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 30px 0 0 0;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+        transition: width 0.22s cubic-bezier(.4, 2, .6, 1),
+          min-width 0.22s cubic-bezier(.4, 2, .6, 1);
+      }
+      .sidebar.closed {
+        width: 60px !important;
+        min-width: 60px !important;
+      }
+      .sidebar .sidebar-header {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px 0 0;
+        margin-bottom: 30px;
+      }
+      .sidebar h2 {
+        font-size: 1.5em;
+        font-weight: 700;
+        margin: 0;
+        width: 100%;
+        text-align: center;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.2s;
+      }
+      .sidebar.closed h2 {
+        opacity: 0;
+        pointer-events: none;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+      }
+      .sidebar ul {
+        list-style: none;
+        padding: 0;
+        width: 100%;
+      }
+      .sidebar ul li {
+        width: 100%;
+      }
+      .sidebar ul li a {
+        display: flex;
+        align-items: center;
+        padding: 14px 30px;
+        color: var(--white);
+        text-decoration: none;
+        font-size: 1.08em;
+        transition: background 0.2s;
+      }
+      .sidebar ul li a:hover,
+      .sidebar ul li a.active {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .sidebar ul li a i {
+        margin-right: 12px;
+        font-size: 1.2em;
+      }
+      .sidebar.closed ul li a span {
+        display: none !important;
+      }
+      .sidebar.closed ul li a {
+        justify-content: center;
+      }
+      .sidebar .sidebar-header button#sidebarToggle {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 1.7em;
+        cursor: pointer;
+        margin-left: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        transition: background 0.15s;
+        display: block;
+      }
+
+      /* Main */
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      header {
+        background: var(--white);
+        padding: 18px 40px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      header h1 {
+        font-size: 1.7em;
+        font-weight: 700;
+        margin: 0;
+        color: var(--primary);
+        letter-spacing: 1px;
+      }
+      header .user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--gray);
+        font-size: 1em;
+      }
+
+      .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 32px;
+        padding: 40px;
+      }
+      .chart-card {
+        background: var(--white);
+        border-radius: 14px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+        padding: 28px 20px 18px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transition: box-shadow 0.2s, transform 0.2s;
+        position: relative;
+        cursor: pointer;
+      }
+      .chart-card:hover {
+        box-shadow: 0 6px 24px rgba(0, 123, 255, 0.13);
+        transform: translateY(-2px) scale(1.01);
+      }
+      .chart-card h2 {
+        font-size: 1.13em;
+        font-weight: 700;
+        margin: 0 0 10px 0;
+        color: var(--primary);
+        letter-spacing: 0.5px;
+        text-align: center;
+      }
+      .chart-card .icon {
+        font-size: 2em;
+        margin-bottom: 8px;
+        color: var(--accent);
+      }
+      .chart-card canvas {
+        width: 100% !important;
+        max-width: 320px;
+        height: 180px !important;
+      }
+
+      footer {
+        background: var(--white);
+        text-align: center;
+        padding: 16px 0 10px 0;
+        color: var(--gray);
+        font-size: 1em;
+        box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.03);
+      }
+
+      /* Modal overlay & content */
+      #chartModal {
+        position: fixed;
+        z-index: 2000;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(30, 42, 80, 0.18);
+      }
+      #modalContent {
+        background: #fff;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        width: calc(100vw - 220px);
+        height: 100vh;
+        box-shadow: none;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-left: 220px;
+        transition: margin-left 0.22s cubic-bezier(.4, 2, .6, 1),
+          width 0.22s cubic-bezier(.4, 2, .6, 1);
+      }
+      /* Khi thu gọn sidebar, dịch modalContent theo */
+      body.sidebar-closed #modalContent {
+        margin-left: 60px;
+        width: calc(100vw - 60px);
+      }
+
+      /* Responsive */
+      @media (max-width: 900px) {
+        .charts-grid {
+          padding: 20px;
+          gap: 18px;
+        }
+        .sidebar {
+          width: 60px;
+          padding: 10px 0;
+        }
+        .sidebar h2 {
+          display: none;
+        }
+        .sidebar ul li a span {
+          display: none;
+        }
+        .sidebar ul li a i {
+          margin-right: 0;
+        }
+      }
+      @media (max-width: 600px) {
+        .charts-grid {
+          grid-template-columns: 1fr;
+          padding: 10px;
+        }
+        header {
+          padding: 10px 12px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="dashboard-layout">
+      <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h2>IoT Water</h2>
+          <button id="sidebarToggle" title="Đóng/mở menu">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+        </div>
+        <ul>
+          <li>
+            <a href="#" class="active">
+              <i class="fa-solid fa-gauge-high"></i>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="#">
+              <i class="fa-solid fa-database"></i>
+              <span>Dữ liệu</span>
+            </a>
+          </li>
+          <li>
+            <a href="#">
+              <i class="fa-solid fa-gear"></i>
+              <span>Cài đặt</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="main-content">
+        <header>
+          <h1>Giám sát chất lượng nước</h1>
+          <div class="user">
+            <i class="fa-solid fa-user-circle"></i>
+            Quản trị viên
+          </div>
+        </header>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-sun"></i></div>
+            <h2>Nhiệt độ không khí</h2>
+            <canvas id="doChart"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-cloud-rain"></i></div>
+            <h2>Độ ẩm không khí</h2>
+            <canvas id="tempChart"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-seedling"></i></div>
+            <h2>Độ ẩm đất</h2>
+            <canvas id="phChart"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-lightbulb"></i></div>
+            <h2>Cường độ ánh sáng</h2>
+            <canvas id="tdsChart"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-battery-half"></i></div>
+            <h2>Mức pin</h2>
+            <canvas id="secchiChart"></canvas>
+          </div>
+
+          <div class="chart-card">
+            <div class="icon"><i class="fa-solid fa-wifi"></i></div>
+            <h2>Trạng thái kết nối</h2>
+            <canvas id="orpChart"></canvas>
+          </div>
+        </div>
+
+        <footer>
+          &copy; 2025 IoT Water Dashboard. Thiết kế bởi GitHub Copilot.
+        </footer>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="chartModal">
+      <div id="modalContent">
+        <button
+          id="closeModalBtn"
+          style="
+            position:absolute; top:24px; right:36px; background:rgba(0,0,0,0.04);
+            border:none; font-size:2.0em; color:#007bff; cursor:pointer;
+            border-radius:50%; width:56px; height:56px; display:flex;
+            align-items:center; justify-content:center; transition:background 0.18s; z-index:10;"
+          onmouseover="this.style.background='#e6eaf3'"
+          onmouseout="this.style.background='rgba(0,0,0,0.04)'"
+          aria-label="Đóng"
+          title="Đóng"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <h2
+          id="modalTitle"
+          style="
+            text-align:center; color:#007bff; margin-bottom:12px; font-size:2.0em;
+            font-weight:800; letter-spacing:0.5px; text-shadow:0 2px 8px rgba(0,123,255,0.07);
+            margin-top:40px;"
+        ></h2>
+
+        <div style="width:96%; height:78vh; display:flex; justify-content:center; align-items:center;">
+          <canvas
+            id="modalChart"
+            style="width:100%; height:100%; background:#fff; border-radius:18px; box-shadow:0 2px 16px rgba(0,123,255,0.07);"
+          ></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+      /* ================= Firebase Realtime Database Integration =================
+         1. Sao chép file firebase-config.example.js -> firebase-config.js và điền giá trị thật.
+         2. Không commit firebase-config.js nếu repo công khai.
+         3. Cấu trúc dữ liệu đề xuất: sensors/{timestamp}/{do,temp,ph,tds,secchi,orp}
+            timestamp có thể là Date.now() hoặc chuỗi thời gian.
+         4. Rules tạm (phát triển): { "rules": { ".read": true, ".write": true } }
+            Khi production: ràng buộc theo auth và validate từng trường.
+         5. Push mẫu (REST):
+            curl -X PUT "https://<dbName>.firebaseio.com/sensors/$(date +%s).json" \
+                 -d '{"do":7.1,"temp":26.4,"ph":7.3,"tds":520,"secchi":40,"orp":315}'
+      */
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+      import { getDatabase, ref, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+      let firebaseConfig = null;
+      try {
+        // dynamic import để tránh lỗi nếu người dùng chưa tạo file thật
+        const cfgModule = await import('./firebase-config.js');
+        firebaseConfig = cfgModule.firebaseConfig;
+      } catch (e) {
+  if (DEBUG) console.warn('[Firebase] Không tìm thấy firebase-config.js, dùng mock data. Chi tiết:', e.message);
+      }
+
+  const DEBUG = false; // bật true để xem log chi tiết
+  let realtimeEnabled = false;
+      let db = null;
+      let restPollingEnabled = false;
+      const REQUIRED_KEYS = ['apiKey','authDomain','databaseURL','projectId','appId'];
+      function hasMinimalConfig(cfg){
+        return cfg && REQUIRED_KEYS.every(k => typeof cfg[k] === 'string' && cfg[k].startsWith('http') === (k==='databaseURL' ? true : true));
+      }
+      if (firebaseConfig && !firebaseConfig.apiKey.startsWith('TODO')) {
+        try {
+          const app = initializeApp(firebaseConfig);
+          db = getDatabase(app);
+          realtimeEnabled = !!db;
+          if (DEBUG) console.log('[Firebase] Initialized (SDK realtime)');
+        } catch (err) {
+          if (DEBUG) console.warn('[Firebase] Init failed, thử REST polling fallback:', err.message);
+          if (firebaseConfig.databaseURL) restPollingEnabled = true;
+        }
+      } else if (firebaseConfig && firebaseConfig.databaseURL) {
+        // thiếu khóa => bật polling REST để vẫn có dữ liệu nếu đã push
+        restPollingEnabled = true;
+  if (DEBUG) console.warn('[Firebase] Config chưa đủ (thiếu apiKey/appId). Bật REST polling fallback.');
+      }
+      // ====== Sidebar toggle (immediate init, script runs after DOM is present) ======
+      function initSidebarToggle() {
+        const sidebarEl = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('sidebarToggle');
+        if (sidebarEl && toggleBtn) {
+          toggleBtn.addEventListener('click', () => {
+            sidebarEl.classList.toggle('closed');
+            document.body.classList.toggle('sidebar-closed', sidebarEl.classList.contains('closed'));
+          });
+        }
+      }
+
+      // ====== Mock data & helpers ======
+      const mockData = {
+        airTemp: { values: [], timestamps: [] },       // Nhiệt độ không khí (°C)
+        airHumidity: { values: [], timestamps: [] },   // Độ ẩm không khí (%)
+        soilHumidity: { values: [], timestamps: [] },  // Độ ẩm đất (%)
+        light: { values: [], timestamps: [] },         // Cường độ ánh sáng (lux giả định)
+        pin: { values: [], timestamps: [] },           // Mức pin (%)
+        connStatus: { values: [], timestamps: [] },    // Trạng thái kết nối (1=Online,0=Offline)
+      };
+      const DATA_LENGTH = 30;
+
+      function randomValue(type) {
+        switch (type) {
+          case 'airTemp':      return +(Math.random() * (38 - 20) + 20).toFixed(1);      // °C
+          case 'airHumidity':  return +(Math.random() * (95 - 40) + 40).toFixed(1);      // %
+          case 'soilHumidity': return +(Math.random() * (90 - 20) + 20).toFixed(1);      // %
+          case 'light':        return +(Math.random() * (12000 - 200) + 200).toFixed(0); // lux giả lập
+          case 'pin':          return +(Math.random() * (100 - 30) + 30).toFixed(0);     // %
+          case 'connStatus':   return Math.random() < 0.8 ? 1 : 0; // 80% online
+        }
+      }
+      function getCurrentTimeLabel() {
+        const d = new Date();
+        return d.getHours().toString().padStart(2, '0') + ':' +
+               d.getMinutes().toString().padStart(2, '0') + ':' +
+               d.getSeconds().toString().padStart(2, '0');
+      }
+      function structureReturn(){
+        return {
+          airTemp:      { timestamps: [...mockData.airTemp.timestamps],      values: [...mockData.airTemp.values] },
+          airHumidity:  { timestamps: [...mockData.airHumidity.timestamps],  values: [...mockData.airHumidity.values] },
+          soilHumidity: { timestamps: [...mockData.soilHumidity.timestamps], values: [...mockData.soilHumidity.values] },
+          light:        { timestamps: [...mockData.light.timestamps],        values: [...mockData.light.values] },
+          pin:          { timestamps: [...mockData.pin.timestamps],          values: [...mockData.pin.values] },
+          connStatus:   { timestamps: [...mockData.connStatus.timestamps],   values: [...mockData.connStatus.values] },
+        };
+      }
+      async function fetchDataMock(){
+        for (const key of Object.keys(mockData)) {
+          if (mockData[key].values.length < DATA_LENGTH) {
+            while (mockData[key].values.length < DATA_LENGTH) {
+              mockData[key].values.push(randomValue(key));
+              mockData[key].timestamps.push(getCurrentTimeLabel());
+            }
+          } else {
+            mockData[key].values.push(randomValue(key));
+            mockData[key].values.shift();
+            mockData[key].timestamps.push(getCurrentTimeLabel());
+            mockData[key].timestamps.shift();
+          }
+        }
+        return structureReturn();
+      }
+      // Khi mở web, lấy 10 điểm cuối cùng để hiển thị trước, sau đó chỉ cập nhật realtime từng điểm mới
+      function attachRealtimeWithInit(){
+        if(!realtimeEnabled) return;
+        // Bước 1: Lấy 10 điểm cuối cùng khi khởi tạo
+        const initQuery = query(ref(db,'sensors'), limitToLast(10));
+        let initialized = false;
+        onValue(initQuery, snapshot => {
+          if (initialized) return; // chỉ lấy lần đầu
+          const data = snapshot.val();
+          if(!data) return;
+          const entries = Object.entries(data);
+          for (const key of Object.keys(mockData)) { mockData[key].values.length=0; mockData[key].timestamps.length=0; }
+          entries.forEach(([ts,obj])=>{
+            const timeLabel = /\d{10,}/.test(ts)
+              ? new Date(Number(ts)).toLocaleTimeString('vi-VN',{hour12:false})
+              : ts;
+            pushVal('airTemp', obj.airTemp ?? obj.temp, timeLabel);
+            pushVal('airHumidity', obj.airHumidity ?? obj.humidity, timeLabel);
+            pushVal('soilHumidity', obj.soilHumidity ?? obj.soil, timeLabel);
+            pushVal('light', obj.light ?? obj.lux, timeLabel);
+            pushVal('pin', obj.pin ?? obj.battery, timeLabel);
+            pushVal('connStatus', typeof obj.connStatus === 'number' ? obj.connStatus : (obj.online===true?1:0), timeLabel);
+          });
+          markDataDirty();
+          refreshAllCharts();
+          if (DEBUG) console.log('[Realtime] Init last 10 records:', entries);
+          initialized = true;
+        });
+        // Bước 2: Lắng nghe bản ghi mới nhất
+        const latestQuery = query(ref(db,'sensors'), limitToLast(1));
+        let lastRealtimeTs = null;
+        onValue(latestQuery, snapshot => {
+          if(!initialized) return; // chỉ cập nhật sau khi đã khởi tạo
+          const data = snapshot.val();
+          if(!data) return;
+          const [ts,obj] = Object.entries(data)[0];
+          // Chỉ vẽ khi timestamp mới khác hoàn toàn với timestamp cuối cùng
+          const lastLabel = mockData['airTemp'].timestamps[mockData['airTemp'].timestamps.length-1];
+          const label = timeLabel(ts);
+          console.log("Last Label:", lastLabel);
+          console.log("Current Label:", label);
+          if (lastLabel === undefined || (ts !== lastRealtimeTs && label !== lastLabel)) {
+            lastRealtimeTs = ts;
+            pushVal('airTemp', obj.airTemp ?? obj.temp, label);
+            pushVal('airHumidity', obj.airHumidity ?? obj.humidity, label);
+            pushVal('soilHumidity', obj.soilHumidity ?? obj.soil, label);
+            pushVal('light', obj.light ?? obj.lux, label);
+            pushVal('pin', obj.pin ?? obj.battery, label);
+            pushVal('connStatus', typeof obj.connStatus === 'number' ? obj.connStatus : (obj.online===true?1:0), label);
+            markDataDirty();
+            refreshAllCharts();
+            if (DEBUG) console.log('[Realtime] Latest record:', ts, obj);
+          } else {
+            // Không thêm vào mảng, không vẽ lại
+            if (DEBUG) console.log('[Realtime] No new data, chart not updated');
+          }
+        }, err => {
+          console.error('[Realtime] listener error:', err.message);
+          realtimeEnabled = false;
+        });
+        function timeLabel(ts) {
+          return /\d{10,}/.test(ts)
+            ? new Date(Number(ts)).toLocaleTimeString('vi-VN',{hour12:false})
+            : ts;
+        }
+      }
+      function pushVal(key,val,label){
+        if(typeof val === 'number'){ mockData[key].values.push(val); mockData[key].timestamps.push(label); }
+      }
+
+      // ====== Small cards charts ======
+      const chartInstances = {};
+      function createLineChart(canvasEl, label, data, color, chartKey) {
+        // Defensive checks to prevent Chart.js errors when DOM/canvas not ready
+        if (!canvasEl) {
+          console.warn('[Chart] Canvas element not found for', chartKey);
+          return;
+        }
+        if (!data || !Array.isArray(data.values) || !Array.isArray(data.timestamps)) {
+          console.warn('[Chart] Data invalid for', chartKey, data);
+          return;
+        }
+        // If initial creation and data arrays are empty, provide a placeholder point
+        if (!chartInstances[chartKey] && data.values.length === 0) {
+          data.values = [0];
+          data.timestamps = [new Date().toLocaleTimeString('vi-VN', { hour12: false })];
+        }
+        if (chartInstances[chartKey]) {
+          const chart = chartInstances[chartKey];
+          chart.data.labels.push(data.timestamps[data.timestamps.length - 1]);
+          chart.data.datasets[0].data.push(data.values[data.values.length - 1]);
+          if (chart.data.labels.length > DATA_LENGTH) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+          }
+          chart.update('none');
+          return;
+        }
+        chartInstances[chartKey] = new Chart(canvasEl, {
+          type: 'line',
+          data: {
+            labels: data.timestamps,
+            datasets: [{
+              label,
+              data: data.values,
+              borderColor: color,
+              backgroundColor: color + '22',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2,
+              pointBackgroundColor: color,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: '#fff',
+              pointBorderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            animation: { duration: 0 },
+            interaction: { mode: 'point', intersect: true },
+            elements: { point: { hitRadius: 2 } },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#fff',
+                titleColor: '#222',
+                bodyColor: '#222',
+                borderColor: color,
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false,
+              },
+            },
+            scales: {
+              x: {
+                display: true,
+                title: { display: true, text: 'Thời gian', color: '#888', font: { weight: 'bold' } },
+                ticks: { color: '#888', font: { size: 12 } },
+                grid: { color: '#f0f0f0' },
+              },
+              y: {
+                display: true,
+                ticks: { color: '#888', font: { size: 12 } },
+                grid: { color: '#f0f0f0' },
+              },
+            },
+          },
+        });
+      }
+
+      async function updateDashboard(){
+        try {
+          const data = realtimeEnabled ? structureReturn() : await fetchDataMock();
+          refreshChartsWithData(data);
+        } catch(e){
+          alert('Không thể tải dữ liệu: ' + e.message);
+        }
+      }
+      function refreshChartsWithData(data){
+        // Map canvas IDs tạm thời sang dữ liệu mới (giữ nguyên id để không phải sửa HTML)
+        createLineChart(document.getElementById('doChart'),    'Nhiệt độ không khí (°C)', data.airTemp,      '#e67e22', 'airTemp');
+        createLineChart(document.getElementById('tempChart'),  'Độ ẩm không khí (%)',     data.airHumidity,  '#007bff', 'airHumidity');
+        createLineChart(document.getElementById('phChart'),    'Độ ẩm đất (%)',           data.soilHumidity, '#27ae60', 'soilHumidity');
+        createLineChart(document.getElementById('tdsChart'),   'Cường độ ánh sáng (lux)', data.light,        '#8e44ad', 'light');
+        createLineChart(document.getElementById('secchiChart'),'Mức pin (%)',             data.pin,          '#16a085', 'pin');
+        createLineChart(document.getElementById('orpChart'),   'Trạng thái kết nối',      data.connStatus,   '#c0392b', 'connStatus');
+      }
+      let newDataSinceLastRender = true; // render lần đầu
+      function markDataDirty(){ newDataSinceLastRender = true; }
+      function refreshAllCharts(){
+        if(!newDataSinceLastRender) return;
+        refreshChartsWithData(structureReturn());
+        newDataSinceLastRender = false;
+      }
+
+      // ====== Modal big chart ======
+      let modalChartInstance = null;
+      let modalChartInterval = null;
+      let modalChartData = null;
+
+      function updateModalChartIncremental(chartKey) {
+        if (!modalChartInstance) return;
+        const src = mockData[chartKey];
+        if (!src || !src.timestamps.length) return;
+        const latestLabel = src.timestamps[src.timestamps.length - 1];
+        const latestValue = src.values[src.values.length - 1];
+
+        const lastLabelInModal =
+          modalChartInstance.data.labels[modalChartInstance.data.labels.length - 1];
+        if (lastLabelInModal === latestLabel) return;
+
+        modalChartInstance.data.labels.push(latestLabel);
+        modalChartInstance.data.datasets[0].data.push(latestValue);
+        if (modalChartInstance.data.labels.length > DATA_LENGTH) {
+          modalChartInstance.data.labels.shift();
+          modalChartInstance.data.datasets[0].data.shift();
+        }
+        modalChartInstance.update('none');
+      }
+
+      function drawModalChart(chartKey, titles, colors, isInit) {
+        document.getElementById('modalTitle').innerText = titles[chartKey];
+        let chartCanvas = document.getElementById('modalChart');
+
+        if (!modalChartInstance || isInit) {
+          if (modalChartInstance) modalChartInstance.destroy();
+
+          // đảm bảo canvas sạch
+          const chartContainer = chartCanvas.parentNode;
+          chartCanvas.remove();
+          const newCanvas = document.createElement('canvas');
+          newCanvas.id = 'modalChart';
+          newCanvas.style.width = '100%';
+          newCanvas.style.maxWidth = '1000px';
+          newCanvas.style.height = '500px';
+          newCanvas.style.background = '#fff';
+          newCanvas.style.borderRadius = '18px';
+          newCanvas.style.boxShadow = '0 2px 16px rgba(0,123,255,0.07)';
+          chartContainer.appendChild(newCanvas);
+
+          chartCanvas = newCanvas;
+          const ctx = chartCanvas.getContext('2d');
+
+          modalChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: [...modalChartData.labels],
+              datasets: [{
+                label: titles[chartKey],
+                data: [...modalChartData.values],
+                borderColor: colors[chartKey],
+                backgroundColor: colors[chartKey] + '22',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 4,
+                pointBackgroundColor: colors[chartKey],
+                pointHoverRadius: 9,
+                pointHoverBackgroundColor: '#fff',
+                pointBorderWidth: 2,
+                borderWidth: 3,
+                clip: false,
+              }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 0 },
+              interaction: { mode: 'index', intersect: false, axis: 'x' },
+              elements: { point: { hitRadius: 12 } },
+              layout: { padding: { top: 18, right: 20, bottom: 18, left: 18 } },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  enabled: true,
+                  position: 'nearest',
+                  backgroundColor: '#fff',
+                  titleColor: '#222',
+                  bodyColor: '#222',
+                  borderColor: colors[chartKey],
+                  borderWidth: 1.5,
+                  padding: 16,
+                  displayColors: false,
+                  titleFont: { weight: 'bold', size: 18 },
+                  bodyFont: { size: 16 },
+                },
+              },
+              scales: {
+                x: {
+                  display: true,
+                  title: { display: true, text: 'Thời gian', color: '#888', font: { weight: 'bold', size: 18 } },
+                  ticks: { color: '#888', font: { size: 16 } },
+                  grid: { color: '#f0f0f0' },
+                },
+                y: {
+                  display: true,
+                  ticks: { color: '#888', font: { size: 16 } },
+                  grid: { color: '#f0f0f0' },
+                },
+              },
+            }
+          });
+        } else {
+          modalChartInstance.data.labels.splice(0, modalChartInstance.data.labels.length, ...modalChartData.labels);
+          modalChartInstance.data.datasets[0].data.splice(0, modalChartInstance.data.datasets[0].data.length, ...modalChartData.values);
+          modalChartInstance.update('none');
+        }
+      }
+
+      function renderModalChart(chartKey, isInit = false) {
+        const titles = {
+          airTemp: 'Nhiệt độ không khí (°C)',
+          airHumidity: 'Độ ẩm không khí (%)',
+          soilHumidity: 'Độ ẩm đất (%)',
+          light: 'Cường độ ánh sáng (lux)',
+          pin: 'Mức pin (%)',
+          connStatus: 'Trạng thái kết nối',
+        };
+        const colors = {
+          airTemp: '#e67e22',
+          airHumidity: '#007bff',
+          soilHumidity: '#27ae60',
+          light: '#8e44ad',
+          pin: '#16a085',
+          connStatus: '#c0392b',
+        };
+
+        if (!modalChartInstance || isInit) {
+          modalChartData = {
+            labels: [...mockData[chartKey].timestamps],
+            values: [...mockData[chartKey].values],
+          };
+          drawModalChart(chartKey, titles, colors, true);
+        } else {
+          updateModalChartIncremental(chartKey);
+        }
+      }
+
+      function showChartModal(chartKey) {
+        const modal = document.getElementById('chartModal');
+        modal.style.display = 'flex';
+        setTimeout(() => {
+          renderModalChart(chartKey, true);
+          if (modalChartInterval) clearInterval(modalChartInterval);
+          modalChartInterval = setInterval(() => renderModalChart(chartKey, false), 5000);
+        }, 50);
+      }
+
+      // ====== Events & Dashboard logic (immediate init) ======
+      function initDashboardLogic() {
+        // mở modal khi click card
+        document.querySelectorAll('.chart-card').forEach((card) => {
+          card.addEventListener('click', () => {
+            const canvas = card.querySelector('canvas');
+            if(!canvas) return;
+            const idToKey = {
+              'doChart': 'airTemp',
+              'tempChart': 'airHumidity',
+              'phChart': 'soilHumidity',
+              'tdsChart': 'light',
+              'secchiChart': 'pin',
+              'orpChart': 'connStatus'
+            };
+            const chartKey = idToKey[canvas.id];
+            if(!chartKey){ console.warn('[Modal] Không tìm thấy mapping cho', canvas.id); return; }
+            showChartModal(chartKey);
+          });
+        });
+
+        // đóng modal
+        const closeBtn = document.getElementById('closeModalBtn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            document.getElementById('chartModal').style.display = 'none';
+            if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
+            if (modalChartInterval) { clearInterval(modalChartInterval); modalChartInterval = null; }
+            modalChartData = null;
+          });
+        }
+        const chartModal = document.getElementById('chartModal');
+        if (chartModal) {
+          chartModal.addEventListener('click', (e) => {
+            if (e.target === chartModal) {
+              chartModal.style.display = 'none';
+              if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
+              if (modalChartInterval) { clearInterval(modalChartInterval); modalChartInterval = null; }
+              modalChartData = null;
+            }
+          });
+        }
+
+        // Khởi tạo dữ liệu
+        if (realtimeEnabled) {
+          attachRealtimeWithInit();
+          if (DEBUG) console.log('[Init] Realtime listener attached (no periodic refresh)');
+        } else if (restPollingEnabled) {
+          // Poll REST mỗi 5s lấy 30 bản ghi cuối
+          const poll = async () => {
+            try {
+              const resp = await fetch(firebaseConfig.databaseURL + '/sensors.json?orderBy="$key"&limitToLast=' + DATA_LENGTH);
+              const data = await resp.json();
+              if (data && typeof data === 'object') {
+                for (const key of Object.keys(mockData)) { mockData[key].values.length = 0; mockData[key].timestamps.length = 0; }
+                const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+                entries.forEach(([ts, obj]) => {
+                  const timeLabel = /\d{10,}/.test(ts) ? new Date(Number(ts)).toLocaleTimeString('vi-VN', { hour12: false }) : ts;
+                  pushVal('airTemp', obj.airTemp ?? obj.temp, timeLabel);
+                  pushVal('airHumidity', obj.airHumidity ?? obj.humidity, timeLabel);
+                  pushVal('soilHumidity', obj.soilHumidity ?? obj.soil, timeLabel);
+                  pushVal('light', obj.light ?? obj.lux, timeLabel);
+                  pushVal('pin', obj.pin ?? obj.battery, timeLabel);
+                  pushVal('connStatus', typeof obj.connStatus === 'number' ? obj.connStatus : (obj.online===true?1:0), timeLabel);
+                });
+                refreshAllCharts();
+              }
+            } catch (err) {
+              if (DEBUG) console.warn('[REST Poll] Lỗi lấy dữ liệu:', err.message);
+            }
+          };
+          poll();
+          setInterval(poll, 5000);
+          if (DEBUG) console.log('[Init] REST polling enabled');
+        } else {
+          updateDashboard();
+          setInterval(updateDashboard, 5000);
+          if (DEBUG) console.log('[Init] Mock data mode');
+        }
+      }
+
+      // ====== Immediate initialization (DOMContentLoaded đã xảy ra trước khi script chèn động) ======
+      initSidebarToggle();
+      initDashboardLogic();
+  if (DEBUG) console.log('[Init] Dashboard logic executed immediately');
+    </script>
+  </body>
+</html>

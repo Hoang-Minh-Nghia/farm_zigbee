@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Demo Realtime Firebase - Chỉ lấy bản ghi mới nhất</title>
+</head>
+<body style="font-family:Arial, sans-serif; margin:16px;">
+  <h2 style="margin:0 0 12px; font-size:20px;">Kiểm tra bản ghi mới nhất từ Firebase</h2>
+  <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+    <div style="flex:1; min-width:260px; max-width:420px; background:#fff; border:1px solid #eee; padding:12px 16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+      <strong style="color:#007bff;">Bản ghi mới nhất:</strong>
+      <pre id="output" style="margin:8px 0 0; max-height:300px; overflow:auto; background:#f9fafb; padding:8px; border:1px solid #e5e7eb; border-radius:6px;">Đang kết nối...</pre>
+    </div>
+  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import { getDatabase, ref, query, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBTmeB0WNy_89O7OnXUK_ljYlFWiLsN2jc",
+      authDomain: "iot-uit-hmn.firebaseapp.com",
+      databaseURL: "https://iot-uit-hmn-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "iot-uit-hmn",
+      storageBucket: "iot-uit-hmn.appspot.com",
+      messagingSenderId: "8698529201",
+      appId: "1:8698529201:web:be53c25b9e72e766b96990"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    // Chỉ lấy bản ghi mới nhất
+    const sensorsQuery = query(ref(db, 'sensors'), limitToLast(1));
+    onValue(sensorsQuery, (snapshot) => {
+      const data = snapshot.val();
+      console.log('Bản ghi mới nhất:', data);
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
